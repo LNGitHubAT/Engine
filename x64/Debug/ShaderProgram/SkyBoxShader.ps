@@ -1,0 +1,18 @@
+
+TextureCube cubeMapTexture;
+
+SamplerState SampleType;
+
+struct  PixelInput
+{
+	float4 position : SV_POSITION;
+	float3 positionLocal : POSITION;
+};
+
+
+
+
+float4 main(PixelInput input) : SV_TARGET
+{
+	return cubeMapTexture.Sample(SampleType, input.positionLocal);
+}

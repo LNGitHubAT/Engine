@@ -1,0 +1,79 @@
+
+cbuffer PerTesselatedPointBuffer
+{
+	float4x4 wolrdMatrix;
+	float4x4 viewMatrix;
+	float4x4 projectionMatrix;
+	float textureScale;
+	float3 pad;
+};
+
+
+struct HullOut
+{
+	float3 position : POSITION;
+	float3 positionW     : POSITION1;
+	float2 textureCoordinate : TEXCOORD;
+};
+
+
+
+
+struct DomainOut
+{
+	float4 position : SV_POSITION;
+	float3 positionW : POSITION;
+	// for height map sampler
+	float2 textureCoordinate : TEXCOORD;
+	// for texturing
+	float2 tiledTex : TEXCOORD1;
+};
+
+struct PatchTesselationFactor
+{
+	float EdgeTess[4] :  SV_TessFactor;
+	float InsideTess[2] : SV_InsideTessFactor;
+};
+Texture2D heightMap : register( t3 );
+SamplerState samHeightmap
+{
+	Filter = MIN_MAG_LINEAR_MIP_POINT;
+
+	AddressU = CLAMP;
+	AddressV = CLAMP;
+};
+
+[domain("quad")]
+DomainOut main(PatchTesselationFactor factor,
+				float2 uv : SV_DomainLocation,
+				const OutputPatch<HullOut, 4> outputPatch
+				)
+{
+	DomainOut dout;
+	//Bilerp
+	dout.positionW = lerp(
+					lerp(outputPatch[0].position, outputPatch[1].position , uv.x  ) , 
+					lerp(outputPatch[2].position, outputPatch[3].position , uv.x  ) ,
+					uv.y);
+
+	dout.textureCoordinate = lerp(
+							lerp(outputPatch[0].textureCoordinate, outputPatch[1].textureCoordinate, uv.x),
+							lerp(outputPatch[2].textureCoordinate, outputPatch[3].textureCoordinate, uv.x),
+							uv.y); 
+	
+
+	dout.positionW.y = (heightMap.SampleLevel( samHeightmap, dout.textureCoordinate, 0 )).r ;
+
+	//dout.positionW.y = -2.0f;
+
+	dout.positionW = mul(float4(dout.positionW, 1.0f), wolrdMatrix).xyz;
+
+	dout.position = mul (float4(dout.positionW, 1.0f), viewMatrix);
+
+	dout.position = mul (dout.position, projectionMatrix);
+
+	dout.tiledTex  = dout.textureCoordinate * textureScale;
+
+	return dout;
+
+}	

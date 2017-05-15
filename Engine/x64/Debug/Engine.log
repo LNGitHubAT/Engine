@@ -1,0 +1,48 @@
+﻿  main.cpp
+f:\dx11\engine\engine\terrain.h(65): warning C4244: 'initializing': conversion from 'float' to 'const int', possible loss of data
+  WindowInit.cpp
+f:\dx11\engine\engine\terrain.h(65): warning C4244: 'initializing': conversion from 'float' to 'const int', possible loss of data
+  WaveMesh.cpp
+f:\dx11\engine\engine\wavemesh.cpp(35): warning C4018: '<': signed/unsigned mismatch
+f:\dx11\engine\engine\wavemesh.cpp(37): warning C4018: '<': signed/unsigned mismatch
+f:\dx11\engine\engine\wavemesh.cpp(45): warning C4018: '<': signed/unsigned mismatch
+f:\dx11\engine\engine\wavemesh.cpp(47): warning C4018: '<': signed/unsigned mismatch
+f:\dx11\engine\engine\wavemesh.cpp(74): warning C4018: '<': signed/unsigned mismatch
+f:\dx11\engine\engine\wavemesh.cpp(76): warning C4018: '<': signed/unsigned mismatch
+f:\dx11\engine\engine\wavemesh.cpp(84): warning C4018: '<': signed/unsigned mismatch
+f:\dx11\engine\engine\wavemesh.cpp(86): warning C4018: '<': signed/unsigned mismatch
+  TreeBillBoardObject.cpp
+  TreeBillBoard.cpp
+  Terrain.cpp
+f:\dx11\engine\engine\terrain.h(65): warning C4244: 'initializing': conversion from 'float' to 'const int', possible loss of data
+f:\dx11\engine\engine\terrain.cpp(268): warning C4267: '=': conversion from 'size_t' to 'UINT', possible loss of data
+f:\dx11\engine\engine\terrain.cpp(311): warning C4267: '=': conversion from 'size_t' to 'UINT', possible loss of data
+f:\dx11\engine\engine\terrain.cpp(350): warning C4018: '<': signed/unsigned mismatch
+f:\dx11\engine\engine\terrain.cpp(352): warning C4018: '<': signed/unsigned mismatch
+  TankPlayerObject.cpp
+f:\dx11\engine\engine\terrain.h(65): warning C4244: 'initializing': conversion from 'float' to 'const int', possible loss of data
+  SkyBox.cpp
+  PointLightObject.cpp
+  PhysicsObject.cpp
+  Mesh.cpp
+f:\dx11\engine\engine\mesh.cpp(529): warning C4267: '=': conversion from 'size_t' to 'UINT', possible loss of data
+f:\dx11\engine\engine\mesh.cpp(577): warning C4267: '=': conversion from 'size_t' to 'UINT', possible loss of data
+  Graphics.cpp
+f:\dx11\engine\engine\terrain.h(65): warning C4244: 'initializing': conversion from 'float' to 'const int', possible loss of data
+f:\dx11\engine\engine\graphics.cpp(460): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+  GameObject.cpp
+  Game.cpp
+f:\dx11\engine\engine\terrain.h(65): warning C4244: 'initializing': conversion from 'float' to 'const int', possible loss of data
+  GUI.cpp
+  BulletObject.cpp
+f:\dx11\engine\engine\terrain.h(65): warning C4244: 'initializing': conversion from 'float' to 'const int', possible loss of data
+  AABBCollider.cpp
+  Generating Code...
+f:\dx11\engine\engine\graphics.cpp(227): warning C4715: 'Graphics::render': not all control paths return a value
+  Compiling...
+  TankObject.cpp
+f:\dx11\engine\engine\terrain.h(65): warning C4244: 'initializing': conversion from 'float' to 'const int', possible loss of data
+f:\dx11\engine\engine\tankobject.cpp(175): warning C4101: 'upVector': unreferenced local variable
+  Generating Code...
+  Engine.vcxproj -> F:\Dx11\Engine\x64\Debug\Engine.exe
+  Engine.vcxproj -> F:\Dx11\Engine\x64\Debug\Engine.pdb (Full PDB)

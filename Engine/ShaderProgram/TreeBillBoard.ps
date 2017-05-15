@@ -1,0 +1,125 @@
+
+struct Material
+{
+	float4 ambient;
+	float4 diffuse;
+	float4 specular;
+	float4 reflect;
+};
+
+struct PointLight
+{
+	float4 ambient;
+	float4 diffuse;
+	float4 specular;
+	float3 position;
+	float range;
+	float3 attenuation;
+	float pad;
+};
+
+cbuffer LightBuffer
+{
+	Material material;
+	PointLight pointLight;
+	float3 cameraPosition;
+	bool isUseTexture;
+	bool isUseAlphaClipTest;
+	float fogStart;
+	float fogRange;
+	float pad;
+	float4 fogColor;
+};
+
+Texture2DArray treeTextureArray;
+SamplerState SampleType;
+
+struct PixelInput
+{
+	float4 posH : SV_POSITION;
+	float3 posW : POSITION;
+	float3 normalW : NORMAL;
+	float2 textureCoord : TEXTCOORD;
+	uint primID : SV_PrimitiveID;
+};
+
+void computePointLight (Material mat, 
+						PointLight pointLight, 
+						out float4 ambient, out float4 diffuse, out float4 specular,
+						float3 position,
+						float3 normal)
+{
+	ambient = float4(0.0f,0.0f,0.0f,0.0f);
+	diffuse = float4(0.0f,0.0f,0.0f,0.0f);
+	specular = float4(0.0f,0.0f,0.0f,0.0f);
+
+	float3 lightDirection = position - pointLight.position;
+	float distance = length(lightDirection);
+	lightDirection /= distance;
+
+
+	[flatten]
+	if( distance > pointLight.range)
+		return;
+
+	ambient = mat.ambient * pointLight.ambient;
+	
+	float diffuseFactor = dot(-lightDirection, normal);
+	[flatten]
+	if(diffuseFactor > 0.0f)
+	{
+		float3 reflectVector = reflect(lightDirection, normal);
+		float3 toCameraVector = cameraPosition - position;
+		toCameraVector = normalize(toCameraVector);
+		float specularFactor = pow(max(dot(reflectVector, toCameraVector), 0.0f ), mat.specular.w);
+
+		diffuse = diffuseFactor * mat.diffuse * pointLight.diffuse;
+		specular = specularFactor * mat.specular * pointLight.specular;
+		
+	}
+	
+	//float att = 1.0f / dot(pointLight.attenuation, float3(1.0f, distance, distance * distance) );
+	float att = 1.0f / distance * distance;
+	diffuse *= att;
+	specular *= att;
+}
+
+float4 main(PixelInput input) : SV_TARGET
+{
+	float4 totalAmbient = float4(0.0f,0.0f,0.0f,0.0f);
+	float4 totalDiffuse = float4(0.0f,0.0f,0.0f,0.0f);
+	float4 totalSpecular = float4(0.0f,0.0f,0.0f,0.0f);
+	
+	float4 textureColor = float4(1.0f,1.0f,1.0f,1.0f);
+	float3 uvwTextCoord = float3(input.textureCoord.xy, input.primID % 4);
+	if(isUseTexture)
+	{
+		textureColor = treeTextureArray.Sample(SampleType, uvwTextCoord);
+		if(isUseAlphaClipTest)
+			clip(textureColor.a - 0.1f);
+	}
+	
+
+	float4 Afactor, Dfactor, Sfactor;
+	computePointLight(material, pointLight, Afactor,  Dfactor, Sfactor, input.posW, input.normalW);
+
+	totalAmbient += Afactor;
+	totalDiffuse += Dfactor;
+	totalSpecular += Sfactor;
+
+	
+	float4 resultColor = textureColor * (totalAmbient + totalDiffuse) + totalSpecular;
+	//float4 resultColor = textureColor;
+	
+	//Calculate fogged result color
+
+	float3 toCameraVector = cameraPosition - input.posW;
+	float distanceToCam = length(toCameraVector);
+	float fogLerp = saturate((distanceToCam - fogStart) / fogRange);
+
+	resultColor = lerp(resultColor, fogColor, fogLerp);
+
+	resultColor.a = material.diffuse.a * textureColor.a;
+
+	return resultColor;
+}

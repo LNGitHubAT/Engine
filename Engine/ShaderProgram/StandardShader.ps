@@ -1,0 +1,176 @@
+
+struct Material
+{
+	float4 ambient;
+	float4 diffuse;
+	float4 specular;
+	float4 reflect;
+	float4 refract;
+	float fresnelPower;
+	float3 pad;
+};
+
+struct PointLight
+{
+	float4 ambient;
+	float4 diffuse;
+	float4 specular;
+	float3 position;
+	float range;
+	float3 attenuation;
+	float pad;
+};
+
+
+cbuffer LightBuffer
+{
+	Material material;
+	PointLight pointLight;
+	float3 cameraPosition;
+	bool isUseTexture;
+	bool isUseAlphaClipTest;
+	bool isUseCubeMap;
+	float fogStart;
+	float fogRange;
+	float4 fogColor;
+};
+
+Texture2D shaderTexture;
+SamplerState SampleType;
+
+
+TextureCube cubeMapTexture;
+SamplerState samTriLinearSam
+{
+	Filter = MIN_MAG_MIP_LINEAR;
+	AddressU = WRAP;
+	AddressV = WRAP ;
+};
+
+void computePointLight (Material mat, 
+						PointLight pointLight, 
+						out float4 ambient, out float4 diffuse, out float4 specular,
+						float3 position,
+						float3 normal)
+{
+	ambient = float4(0.0f,0.0f,0.0f,0.0f);
+	diffuse = float4(0.0f,0.0f,0.0f,0.0f);
+	specular = float4(0.0f,0.0f,0.0f,0.0f);
+
+	float3 lightDirection = position - pointLight.position;
+	float distance = length(lightDirection);
+	lightDirection /= distance;
+
+
+	[flatten]
+	if( distance > pointLight.range)
+		return;
+
+	ambient = mat.ambient * pointLight.ambient;
+	
+	float diffuseFactor = dot(-lightDirection, normal);
+	[flatten]
+	if(diffuseFactor > 0.0f)
+	{
+		float3 reflectVector = reflect(lightDirection, normal);
+		float3 toCameraVector = cameraPosition - position;
+		toCameraVector = normalize(toCameraVector);
+		float specularFactor = pow(max(dot(reflectVector, toCameraVector), 0.0f ), mat.specular.w);
+
+		diffuse = diffuseFactor * mat.diffuse * pointLight.diffuse;
+		specular = specularFactor * mat.specular * pointLight.specular;
+		
+	}
+
+	float att = 1.0f / (dot(pointLight.attenuation, float3(1.0f, distance, distance * distance) ));
+	diffuse *= att;
+	specular *= att;
+}
+
+struct  PixelInput
+{
+	float4 position : SV_POSITION;
+	float3 positionW : POSITION;
+	float3 positionL : POSITION1;
+	float3 normal : NORMAL;
+	float2 textCoord : TEXCOORD;
+};
+
+
+
+float4 main(PixelInput input) : SV_TARGET
+{
+	float4 totalAmbient = float4(0.0f,0.0f,0.0f,0.0f);
+	float4 totalDiffuse = float4(0.0f,0.0f,0.0f,0.0f);
+	float4 totalSpecular = float4(0.0f,0.0f,0.0f,0.0f);
+	
+	float4 textureColor = float4(1.0f,1.0f,1.0f,1.0f);
+	if(isUseTexture)
+	{
+		textureColor = shaderTexture.Sample(SampleType, input.textCoord);
+		if(isUseAlphaClipTest)
+			clip(textureColor.a - 0.1f);
+	}
+	
+
+	float4 Afactor, Dfactor, Sfactor;
+	computePointLight(material, pointLight, Afactor,  Dfactor, Sfactor, input.positionW, input.normal);
+
+	totalAmbient += Afactor;
+	totalDiffuse += Dfactor;
+	totalSpecular += Sfactor;
+
+
+	float4 texturedColor = textureColor * (totalAmbient + totalDiffuse);
+	
+	
+	
+	
+
+	
+	// cube map reflection;
+	
+	if(isUseCubeMap)
+	{
+		float4 reflectColor = float4( 0.0f, 0.0f, 0.0f, 0.0f);
+		float4 refracColor = float4( 0.0f, 0.0f, 0.0f, 0.0f);
+
+		float3 toPoint = (input.positionW - cameraPosition );
+
+		float3 reflectionVector  = reflect(toPoint, input.normal);
+		reflectionVector += input.positionL;
+		reflectColor = cubeMapTexture.Sample(samTriLinearSam, reflectionVector);
+		reflectColor *= material.reflect;
+
+		float3 refractionVector  = refract(toPoint, input.normal, 1.0f / 1.2f);
+		refractionVector += input.positionL;
+		refracColor = cubeMapTexture.Sample(samTriLinearSam, refractionVector);
+		refracColor *= material.refract;
+
+		float fresnelLerp = pow(dot(normalize(-toPoint), input.normal), material.fresnelPower);
+
+		texturedColor = lerp(texturedColor, refracColor, material.reflect.r);
+		texturedColor = lerp(reflectColor, texturedColor, fresnelLerp);
+
+	}
+	
+	float4 resultColor = texturedColor + totalSpecular;
+
+
+
+
+
+	//Calculate fogged result color
+
+	float3 toCameraVector = cameraPosition - input.positionW;
+	float distanceToCam = length(toCameraVector);
+	float fogLerp = saturate((distanceToCam - fogStart) / fogRange);
+	//fogLerp = 0.0f;
+	resultColor = lerp(resultColor, fogColor, fogLerp);
+
+
+	resultColor.a = material.diffuse.a * textureColor.a;
+	return resultColor;
+
+
+}

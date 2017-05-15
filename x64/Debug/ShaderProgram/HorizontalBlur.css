@@ -1,0 +1,83 @@
+
+Texture2D textureInput; // orignal image
+RWTexture2D<float4> output; // blurred image
+
+//cbuffer BlurParameters
+//{
+	//int blurRadius;
+	//float sigma;
+	//float2 pad;
+//};
+
+#define NUMBER_THREAD 256 // number of threads in group
+
+#define MAX_RADIUS 10
+
+#define BLUR_RADIUS 5
+
+float calculateWeigth(int ID)
+{
+
+	return exp( -pow(ID, 2) / ( 2 * 1 ) );
+}
+
+void calculateWeights(int kernel,out float weights[2 * MAX_RADIUS + 1], int blurRadius)
+{
+
+	float totalWeight = 0;
+	for	(int i = -blurRadius; i <= blurRadius ; i ++)
+	{
+		float weight = calculateWeigth(i);
+		weights[i + blurRadius] = weight;
+		totalWeight += weight;
+	}
+	for	(int i = 0; i <= 2 * blurRadius ; i ++)
+	{
+		weights[i] /= totalWeight;
+	}
+}
+
+
+
+
+groupshared float4 textureValue[NUMBER_THREAD + 2 * BLUR_RADIUS];
+
+[numthreads(NUMBER_THREAD, 1, 1)]
+void main(int3 groupThreadId: SV_GroupThreadID,
+		 int3 dispatchThreadID : SV_DispatchThreadID	)
+{
+	//Sample texture
+
+	// top most of the thread group sample 2 texture
+	if(groupThreadId.x < BLUR_RADIUS) 
+	{
+		int pixelX = max(dispatchThreadID.x - BLUR_RADIUS, 0);
+		textureValue[groupThreadId.x] = textureInput[int2(pixelX, dispatchThreadID.y)];
+	}
+
+	if(groupThreadId.x >= NUMBER_THREAD - BLUR_RADIUS) 
+	{
+		int pixelX= min(dispatchThreadID.x + BLUR_RADIUS, textureInput.Length.x -1);
+		textureValue[groupThreadId.x + 2 * BLUR_RADIUS] = textureInput[int2(pixelX, dispatchThreadID.y)];
+	}
+
+	// clamp x, y pixel into image size
+	textureValue[groupThreadId.x + BLUR_RADIUS] = textureInput[min(dispatchThreadID.xy, textureInput.Length.xy - 1)];
+	GroupMemoryBarrierWithGroupSync(); // wait all thread done fetch texture into cache
+	
+	
+	float gWeights[11] =
+	{
+	0.05f, 0.05f, 0.1f, 0.1f, 0.1f, 0.2f, 0.1f, 0.1f, 0.1f, 0.05f, 0.05f,
+	};
+
+	
+	// blur
+	float4 blurColor = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	for(int i = -BLUR_RADIUS; i <= BLUR_RADIUS; i++)
+	{
+		int weightID = i + BLUR_RADIUS;
+		blurColor += textureValue[groupThreadId.x + weightID] * gWeights[weightID];
+	}
+	output[dispatchThreadID.xy] = blurColor;
+}

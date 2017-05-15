@@ -1,0 +1,60 @@
+struct Material
+{
+	float4 ambient;
+	float4 diffuse;
+	float4 specular;
+	float4 reflect;
+};
+
+struct PointLight
+{
+	float4 ambient;
+	float4 diffuse;
+	float4 specular;
+	float3 position;
+	float range;
+	float3 attenuation;
+	float pad;
+};
+
+
+void computePointLight (Material mat, 
+						PointLight pointLight, 
+						out float4 ambient, out float4 diffuse, out float4 specular,
+						float3 position,
+						float3 normal)
+{
+	ambient = float4(0.0f,0.0f,0.0f,0.0f);
+	diffuse = float4(0.0f,0.0f,0.0f,0.0f);
+	specular = float4(0.0f,0.0f,0.0f,0.0f);
+
+	float3 lightDirection = position - pointLight.position;
+	float distance = length(lightDirection);
+	lightDirection /= distance;
+
+
+	[flatten]
+	if( distance > pointLight.range)
+		return;
+
+	ambient = mat.ambient * pointLight.ambient;
+	
+	float diffuseFactor = dot(-lightDirection, normal);
+	[flatten]
+	if(diffuseFactor > 0.0f)
+	{
+		float3 reflectVector = reflect(lightDirection, normal);
+		float3 toCameraVector = cameraPosition - position;
+		toCameraVector = normalize(toCameraVector);
+		float specularFactor = pow(max(dot(reflectVector, toCameraVector), 0.0f ), mat.specular.w);
+
+		diffuse = diffuseFactor * mat.diffuse * pointLight.diffuse;
+		specular = specularFactor * mat.specular * pointLight.specular;
+		
+	}
+	
+	float att = 1.0f / dot(pointLight.attenuation, float3(1.0f, distance, distance * distance) );
+	//float att = 1.0f / distance * distance;
+	diffuse *= att;
+	specular *= att;
+}

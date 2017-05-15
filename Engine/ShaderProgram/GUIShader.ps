@@ -1,0 +1,22 @@
+
+Texture2D shaderTexture;
+SamplerState SampleType;
+
+
+
+struct  PixelInput
+{
+	float4 position : SV_POSITION;
+	float3 normal : NORMAL;
+	float2 textCoord : TEXCOORD;
+};
+
+
+
+float4 main(PixelInput input) : SV_TARGET
+{
+	
+	return shaderTexture.Sample(SampleType, input.textCoord);
+
+	
+}

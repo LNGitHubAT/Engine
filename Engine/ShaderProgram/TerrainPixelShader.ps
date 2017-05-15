@@ -1,0 +1,185 @@
+// light helper fucntion
+struct Material
+{
+	float4 ambient;
+	float4 diffuse;
+	float4 specular;
+	float4 reflect;
+	float4 refract;
+	float fresnelPower;
+	float3 pad;
+};
+
+struct PointLight
+{
+	float4 ambient;
+	float4 diffuse;
+	float4 specular;
+	float3 position;
+	float range;
+	float3 attenuation;
+	float pad;
+};
+
+
+void computePointLight (Material mat, 
+						PointLight pointLight, 
+						out float4 ambient, out float4 diffuse, out float4 specular,
+						float3 position,
+						float3 normal, float3 cameraPosition)
+{
+	ambient = float4(0.0f,0.0f,0.0f,0.0f);
+	diffuse = float4(0.0f,0.0f,0.0f,0.0f);
+	specular = float4(0.0f,0.0f,0.0f,0.0f);
+
+	float3 lightDirection = position - pointLight.position;
+	float distance = length(lightDirection);
+	lightDirection /= distance;
+
+
+	[flatten]
+	if( distance > pointLight.range)
+		return;
+
+	ambient = mat.ambient * pointLight.ambient;
+	
+	float diffuseFactor = dot(-lightDirection, normal);
+	[flatten]
+	if(diffuseFactor > 0.0f)
+	{
+		float3 reflectVector = reflect(lightDirection, normal);
+		float3 toCameraVector = cameraPosition - position;
+		toCameraVector = normalize(toCameraVector);
+		float specularFactor = pow(max(dot(reflectVector, toCameraVector), 0.0f ), mat.specular.w);
+
+		diffuse = diffuseFactor * mat.diffuse * pointLight.diffuse;
+		specular = specularFactor * mat.specular * pointLight.specular;
+		
+	}
+	
+	float att = 1.0f / dot(pointLight.attenuation, float3(1.0f, distance, distance * distance) );
+	//float att = 1.0f / distance * distance;
+	diffuse *= att;
+	specular *= att;
+}
+
+//
+cbuffer PerPixelBuffer
+{
+	Material material;
+	PointLight pointLight;
+	float3 cameraPosition;
+	float worldCellSpace;
+	float4 fogColor;
+	float fogStart;
+	float fogRange;
+	float2 heightMapCellSpace;
+	
+};
+
+struct DomainOut
+{
+	float4 position : SV_POSITION;
+	float3 positionW : POSITION;
+	// for height map sampler
+	float2 textureCoordinate : TEXCOORD;
+	// for texturing
+	float2 tiledTex : TEXCOORD1;
+};
+
+Texture2DArray layers;
+Texture2D blendMap;
+Texture2D heightMap : register ( t4);
+
+SamplerState samplerState;
+
+SamplerState samHeightmap
+{
+	Filter = MIN_MAG_LINEAR_MIP_POINT;
+
+	AddressU = CLAMP;
+	AddressV = CLAMP;
+};
+
+
+float3 calculateNormal(float2 textureCoordinate)
+{
+	float3 normalResult;
+
+
+	float2 lelftTexCoord = textureCoordinate - float2(heightMapCellSpace.x, 0.0f);
+	float2 rightTexCoord = textureCoordinate + float2(heightMapCellSpace.x, 0.0f);
+	float2 upTexCoord = textureCoordinate - float2(0.0f, heightMapCellSpace.y);
+	float2 downTexCoord = textureCoordinate + float2(0.0f, heightMapCellSpace.y);
+	
+	float leftY   = heightMap.SampleLevel( samHeightmap, lelftTexCoord, 0 ).r;
+	float rightY  = heightMap.SampleLevel( samHeightmap, rightTexCoord, 0 ).r;
+	float bottomY = heightMap.SampleLevel( samHeightmap, downTexCoord, 0 ).r;
+	float topY    = heightMap.SampleLevel( samHeightmap, upTexCoord, 0 ).r;
+
+	float3 targentX = normalize(float3(2 * worldCellSpace, rightY - leftY , 0.0f));
+	float3 targentMinusZ = normalize(float3(0.0f, bottomY - topY , -2 * worldCellSpace));
+
+	normalResult = cross(targentX, targentMinusZ);
+	return normalResult;
+}
+
+
+float4 main(DomainOut din) : SV_Target
+{
+	// texturing
+	float4 textureColor = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	float4 c0 = layers.Sample(samplerState, float3( din.tiledTex, 0.0f ));
+	float4 c1 = layers.Sample(samplerState, float3( din.tiledTex, 1.0f ));
+	float4 c2 = layers.Sample(samplerState, float3( din.tiledTex, 2.0f ));
+	float4 c3 = layers.Sample(samplerState, float3( din.tiledTex, 3.0f ));
+	float4 c4 = layers.Sample(samplerState, float3( din.tiledTex, 4.0f ));
+
+	float4 blender = blendMap.Sample(samplerState, din.textureCoordinate );
+	// blending
+	textureColor = c0;
+	textureColor = lerp(textureColor, c1, blender.r );
+	textureColor = lerp(textureColor, c2, blender.g );
+	textureColor = lerp(textureColor, c3, blender.b );
+	textureColor = lerp(textureColor, c4, blender.a );
+
+	// calculate normal base on height map
+	float3 normal = calculateNormal(din.textureCoordinate);
+
+	//float3 normal = float3(0.0f, 1.0f, 0.0f);
+
+	float4 totalAmbient = float4(0.0f,0.0f, 0.0f, 0.0f);
+	float4 totalSpecular = float4(0.0f,0.0f, 0.0f, 0.0f);
+	float4 totalDiffuse = float4(0.0f,0.0f, 0.0f, 0.0f);
+
+	float4 Afactor, Dfactor, Sfactor;
+
+	computePointLight(material, pointLight, Afactor,  Dfactor, Sfactor, din.positionW, normal, cameraPosition);
+
+	totalAmbient += Afactor;
+	totalDiffuse += Dfactor;
+	totalSpecular += Sfactor;
+
+	//textureColor = float4(0.0f, 0.0f ,1.0f ,1.0f);
+
+	float4 resultColor = textureColor * (totalAmbient + totalDiffuse) + totalSpecular;
+	
+	
+	//Calculate fogged result color
+
+	float3 toCameraVector = cameraPosition - din.positionW;
+	float distanceToCam = length(toCameraVector);
+	float fogLerp = saturate((distanceToCam - fogStart) / fogRange);
+	//fogLerp = 0.0f;
+	resultColor = lerp(resultColor, fogColor, fogLerp);
+
+	resultColor.a = material.diffuse.a * textureColor.a;
+
+
+	return resultColor;
+
+
+
+	//return float4(1.0f, 0.0f ,0.0f ,1.0f);
+	
+}

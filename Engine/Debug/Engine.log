@@ -1,0 +1,6 @@
+﻿  D3DManager.cpp
+f:\dx11\engine\engine\d3dmanager.cpp(26): warning C4101: 'm4xMsaaQuality': unreferenced local variable
+f:\dx11\engine\engine\d3dmanager.cpp(23): warning C4101: 'depthStencilDesc': unreferenced local variable
+f:\dx11\engine\engine\d3dmanager.cpp(18): warning C4101: 'factory': unreferenced local variable
+D3DManager.obj : error LNK2019: unresolved external symbol _D3D11CreateDeviceAndSwapChain@48 referenced in function "public: bool __thiscall D3DManager::init(int,int,bool,bool,struct HWND__ *,bool,float,float,float)" (?init@D3DManager@@QAE_NHH_N0PAUHWND__@@0MMM@Z)
+F:\Dx11\Engine\Debug\Engine.exe : fatal error LNK1120: 1 unresolved externals
